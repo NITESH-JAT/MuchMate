@@ -10,39 +10,57 @@ import { BottomNav } from '@/components/layout/bottom-nav';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/use-auth';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 export default function CartPage() {
-  const { cart, updateQuantity, removeFromCart, getTotalPrice, placeOrder, taxRate, isCartLoading } = useCart();
-  const { user } = useAuth();
+  const { cart, updateQuantity, removeFromCart, getTotalPrice, placeOrder, taxRate, isCartLoading, tableNumber } = useCart();
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const { toast } = useToast();
   
-  useEffect(() => {
-    if (isClient && !user) {
-      router.push('/login?redirect=/cart');
-    }
-  }, [user, router, isClient]);
+  useState(() => {
+    setIsClient(true);
+  });
   
   const subtotal = getTotalPrice();
   const tax = subtotal * taxRate;
   const total = subtotal + tax;
 
   const handlePlaceOrder = () => {
-    if (!user) {
-        router.push('/login?redirect=/cart');
+    if (!customerName || !customerPhone) {
+        toast({
+            variant: "destructive",
+            title: "Missing Information",
+            description: "Please enter your name and phone number."
+        });
         return;
     }
-    placeOrder(total, user);
+    setIsPlacingOrder(true);
+    placeOrder(total, { name: customerName, phone: customerPhone }); 
+    setIsCheckoutOpen(false);
+    setCustomerName('');
+    setCustomerPhone('');
+    setIsPlacingOrder(false);
     router.push('/orders');
   };
   
-  if (!isClient || !user || isCartLoading) {
+  if (!isClient || isCartLoading) {
     return <div className="flex items-center justify-center h-screen bg-background"><p>Loading...</p></div>;
   }
 
@@ -116,9 +134,37 @@ export default function CartPage() {
                 </div>
             </div>
 
-            <Button size="lg" className="w-full" onClick={handlePlaceOrder}>
-              Place Order
-            </Button>
+            <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+                <DialogTrigger asChild>
+                    <Button size="lg" className="w-full" disabled={!tableNumber}>
+                        Place Order
+                    </Button>
+                </DialogTrigger>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Almost there!</DialogTitle>
+                        <DialogDescription>
+                            Please enter your details to place the order. This will be used for your receipt.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="name">Name</Label>
+                            <Input id="name" placeholder="John Doe" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="phone">Phone Number</Label>
+                            <Input id="phone" type="tel" placeholder="1234567890" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsCheckoutOpen(false)}>Cancel</Button>
+                        <Button onClick={handlePlaceOrder} disabled={isPlacingOrder}>
+                            {isPlacingOrder ? "Placing Order..." : "Confirm & Place Order"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
           </div>
         )}
       </main>

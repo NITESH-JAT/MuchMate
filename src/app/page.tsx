@@ -1,3 +1,4 @@
+
 // src/app/page.tsx
 'use client';
 
@@ -17,8 +18,6 @@ import {
   ShoppingCart,
   UtensilsCrossed,
   Flame,
-  User as UserIcon,
-  LogOut,
   AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -36,18 +35,8 @@ import {
   SheetDescription,
   SheetFooter,
 } from '@/components/ui/sheet';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useCart } from '@/hooks/use-cart';
-import { useAuth } from '@/hooks/use-auth';
-import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 
 
@@ -68,8 +57,6 @@ function MenuContent() {
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const { addToCart, cart, menuItems, tableNumber, setTable } = useCart();
-  const { user, logout } = useAuth();
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -84,11 +71,6 @@ function MenuContent() {
 
   const handleAddToCart = (item: MenuItem, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (!user) {
-      const redirectUrl = `/?${searchParams.toString()}`;
-      router.push(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
-      return;
-    }
     addToCart(item);
   };
   
@@ -124,40 +106,14 @@ function MenuContent() {
   )
 
   return (
-    <div className={cn("bg-background min-h-screen", user && "pb-24")}>
+    <div className={cn("bg-background min-h-screen pb-24")}>
       <header className="sticky top-0 bg-background/80 backdrop-blur-sm z-10 p-4 space-y-4 border-b">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 font-semibold text-lg">
             <UtensilsCrossed className="h-6 w-6 text-primary" />
-            <span className="font-headline">MunchMate</span>
+            <span className="font-headline">MunchMate {tableNumber && `- Table ${tableNumber}`}</span>
           </div>
           <div className="flex items-center gap-2">
-             {user ? (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="flex items-center gap-2">
-                           <UserIcon className="h-5 w-5" />
-                           <span>{user.name.split(' ')[0]}</span>
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                        {tableNumber && <DropdownMenuLabel className="font-normal text-muted-foreground">Table: {tableNumber}</DropdownMenuLabel>}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => router.push('/orders')}>
-                           My Orders
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={logout}>
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Logout
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-             ) : (
-                <Button asChild>
-                    <Link href={`/login?redirect=${encodeURIComponent(`/?${searchParams.toString()}`)}`}>Login</Link>
-                </Button>
-             )}
             <ThemeToggle />
             <Link href="/cart" className="relative hidden md:block">
               <ShoppingCart className="h-6 w-6 text-foreground" />
@@ -174,15 +130,15 @@ function MenuContent() {
             className="pl-10 h-12 w-full rounded-full bg-muted border-none"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            disabled={!tableNumber && !!user}
+            disabled={!tableNumber}
           />
         </div>
       </header>
 
       <main className="p-4">
-        {user && !tableNumber && renderNoTableWarning()}
+        {!tableNumber && renderNoTableWarning()}
         
-        {(!user || tableNumber) && (
+        {tableNumber && (
             <>
                 <div className="pb-4">
                 <div className="flex space-x-2 overflow-x-auto pb-2 -mx-4 px-4">
@@ -297,7 +253,7 @@ function MenuContent() {
         </Sheet>
       )}
 
-      {user && <BottomNav />}
+      <BottomNav />
     </div>
   );
 }

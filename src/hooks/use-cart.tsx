@@ -3,7 +3,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
-import type { CartItem, MenuItem, PastOrder, KitchenOrder, SalesData, User, TableStatus, AnalyticsPeriod } from '@/lib/types';
+import type { CartItem, MenuItem, PastOrder, KitchenOrder, SalesData, TableStatus, AnalyticsPeriod } from '@/lib/types';
 import { useToast } from './use-toast';
 import { mockPastOrders, mockKitchenOrders, mockMenu, mockTableStatuses } from '@/lib/data';
 import {
@@ -37,7 +37,7 @@ interface CartContextType {
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
   getTotalPrice: () => number;
-  placeOrder: (total: number, user: User) => void;
+  placeOrder: (total: number, customer: { name: string; phone: string; }) => void;
   pastOrders: PastOrder[];
   kitchenOrders: { new: KitchenOrder[], 'in-progress': KitchenOrder[], completed: KitchenOrder[] };
   updateKitchenOrderStatus: (orderId: string, from: KitchenStatus, to: KitchenStatus) => void;
@@ -109,23 +109,20 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const tableStatuses = useMemo(() => {
-    const currentTableStatuses = mockTableStatuses.map(t => ({ ...t, status: 'Empty' as const }));
-    
-    pastOrders.forEach(order => {
-      // A table is occupied if any order for it has not been fully paid.
-      const isPaymentPending = order.paymentStatus !== 'Approved';
+      const currentTableStatuses = mockTableStatuses.map(t => ({ ...t, status: 'Empty' as const }));
       
-      if (isPaymentPending) {
+      pastOrders.forEach(order => {
         const tableIndex = currentTableStatuses.findIndex(t => t.id.toString() === order.tableNumber);
         if (tableIndex !== -1) {
-          // If any order is pending payment, the table is Occupied.
-          currentTableStatuses[tableIndex].status = 'Occupied';
+          // If any order for a table has a pending payment, it's occupied.
+          if (order.paymentStatus === 'Pending') {
+            currentTableStatuses[tableIndex].status = 'Occupied';
+          }
         }
-      }
-    });
+      });
 
-    return currentTableStatuses;
-}, [pastOrders]);
+      return currentTableStatuses;
+  }, [pastOrders]);
 
   const setTable = useCallback((table: string) => {
     setTableNumber(table);
@@ -200,12 +197,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     writeToStorage('cart', []);
   }, []);
   
-  const placeOrder = useCallback((total: number, user: User) => {
-    if (!user) {
-        toast({ variant: "destructive", title: "Not logged in", description: "Please log in to place an order." });
-        return;
-    }
-
+  const placeOrder = useCallback((total: number, customer: { name: string; phone: string; }) => {
     if (!tableNumber) {
         toast({ variant: "destructive", title: "No Table Number", description: "Please scan a table QR code to start an order." });
         return;
@@ -219,9 +211,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     
     const newOrder: PastOrder = {
       id: newOrderId,
-      userId: user.id,
-      userName: user.name,
-      userPhone: user.phone,
+      userId: `guest-${nanoid(8)}`, // Anonymous user ID
+      userName: customer.name,
+      userPhone: customer.phone,
       tableNumber: tableNumber,
       date: new Date().toISOString(),
       status: 'Pending',
@@ -255,29 +247,29 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const updateKitchenOrderStatus = useCallback((orderId: string, from: KitchenStatus, to: KitchenStatus) => {
     setKitchenOrders(currentKitchenOrders => {
-        const orderToMove = currentKitchenOrders[from].find((o) => o.id === orderId);
-        if (!orderToMove) return currentKitchenOrders;
-
-        const newTime = to === 'completed' ? `${Math.floor(Math.random() * 10) + 5} min ago` : 'In Progress';
-        const updatedOrder = { ...orderToMove, time: newTime };
-
-        const updatedKitchenState = {
-          ...currentKitchenOrders,
-          [from]: currentKitchenOrders[from].filter((o) => o.id !== orderId),
-          [to]: [updatedOrder, ...currentKitchenOrders[to]],
-        };
-        writeToStorage('kitchenOrders', updatedKitchenState);
-        
-        setPastOrders(currentPastOrders => {
-            const newStatus = to === 'in-progress' ? 'Cooking' : 'Completed';
-            const updatedPastOrders = currentPastOrders.map(po => 
-              po.id === orderId ? { ...po, status: newStatus } : po
-            );
-            writeToStorage('pastOrders', updatedPastOrders);
-            return updatedPastOrders;
-        });
-
-        return updatedKitchenState;
+      const orderToMove = currentKitchenOrders[from].find((o) => o.id === orderId);
+      if (!orderToMove) return currentKitchenOrders;
+  
+      const newTime = to === 'completed' ? `${Math.floor(Math.random() * 10) + 5} min ago` : 'In Progress';
+      const updatedOrder = { ...orderToMove, time: newTime };
+  
+      const updatedKitchenState = {
+        ...currentKitchenOrders,
+        [from]: currentKitchenOrders[from].filter((o) => o.id !== orderId),
+        [to]: [updatedOrder, ...currentKitchenOrders[to]],
+      };
+      writeToStorage('kitchenOrders', updatedKitchenState);
+      
+      setPastOrders(currentPastOrders => {
+        const newStatus = to === 'in-progress' ? 'Cooking' : 'Completed';
+        const updatedPastOrders = currentPastOrders.map(po => 
+          po.id === orderId ? { ...po, status: newStatus } : po
+        );
+        writeToStorage('pastOrders', updatedPastOrders);
+        return updatedPastOrders;
+      });
+  
+      return updatedKitchenState;
     });
   }, []);
 

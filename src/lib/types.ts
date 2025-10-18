@@ -31,7 +31,7 @@ export interface CartItem extends MenuItem {
 
 export interface PastOrder {
     id: string;
-    userId: string;
+    userId: string; // Can be a guest ID
     userName: string;
     userPhone: string;
     tableNumber: string;
