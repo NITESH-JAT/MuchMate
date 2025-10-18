@@ -33,7 +33,7 @@
     {
       "id": "pizza1",
       "description": "Margherita Pizza",
-      "imageUrl": "https://images.unsplash.com/photo-1594007654729-407eedc4be65?q=80&w=600&h=400&fit=crop",
+      "imageUrl": "/images/pizza.png",
       "imageHint": "margherita pizza"
     },
     {
@@ -45,7 +45,7 @@
     {
       "id": "dessert1",
       "description": "Chocolate Cake",
-      "imageUrl": "https://images.unsplash.com/photo-1578985545062-69928b1d9587?q=80&w=600&h=400&fit=crop",
+      "imageUrl": "/images/cake.png",
       "imageHint": "chocolate cake"
     }
   ]

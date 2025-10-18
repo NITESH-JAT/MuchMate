@@ -53,6 +53,7 @@ interface CartContextType {
   tableNumber: string | null;
   setTable: (table: string) => void;
   tableStatuses: TableStatus[];
+  addTable: (tableId: number) => boolean;
   analyticsPeriod: AnalyticsPeriod;
   setAnalyticsPeriod: (period: AnalyticsPeriod) => void;
 }
@@ -88,6 +89,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>('weekly');
   const [isCartLoading, setIsCartLoading] = useState(true);
   const [tableNumber, setTableNumber] = useState<string | null>(null);
+  const [tableStatusesState, setTableStatusesState] = useState<TableStatus[]>([]);
+
 
   useEffect(() => {
     setIsCartLoading(true);
@@ -97,32 +100,45 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     const storedKitchenOrders = safeJsonParse<typeof kitchenOrders>(localStorage.getItem('kitchenOrders')) ?? mockKitchenOrders;
     const storedTaxRate = safeJsonParse<number>(localStorage.getItem('taxRate')) ?? 0.08;
     const storedTableNumber = safeJsonParse<string>(localStorage.getItem('tableNumber'));
+    const storedTableStatuses = safeJsonParse<TableStatus[]>(localStorage.getItem('tableStatuses')) ?? mockTableStatuses;
 
     setCart(storedCart);
     setMenuItemsState(storedMenuItems);
     setPastOrders(storedOrders);
     setKitchenOrders(storedKitchenOrders);
     setTaxRateState(storedTaxRate);
+    setTableStatusesState(storedTableStatuses);
     if (storedTableNumber) setTableNumber(storedTableNumber);
     
     setIsCartLoading(false);
   }, []);
 
-  const tableStatuses = useMemo(() => {
-      const currentTableStatuses = mockTableStatuses.map(t => ({ ...t, status: 'Empty' as const }));
-      
-      pastOrders.forEach(order => {
-        const tableIndex = currentTableStatuses.findIndex(t => t.id.toString() === order.tableNumber);
-        if (tableIndex !== -1) {
-          // If any order for a table has a pending payment, it's occupied.
-          if (order.paymentStatus === 'Pending') {
-            currentTableStatuses[tableIndex].status = 'Occupied';
-          }
-        }
-      });
+  const addTable = (tableId: number): boolean => {
+    if (tableStatusesState.some(table => table.id === tableId)) {
+        return false;
+    }
+    const newTable: TableStatus = { id: tableId, status: 'Empty' };
+    setTableStatusesState(current => {
+        const updated = [...current, newTable];
+        writeToStorage('tableStatuses', updated);
+        return updated;
+    });
+    return true;
+  }
 
-      return currentTableStatuses;
-  }, [pastOrders]);
+  const tableStatuses = useMemo(() => {
+      return tableStatusesState.map(t => {
+        const hasPendingOrder = pastOrders.some(order => 
+            order.tableNumber === t.id.toString() && 
+            order.paymentStatus === 'Pending'
+        );
+        return {
+            ...t,
+            status: hasPendingOrder ? 'Occupied' : 'Empty'
+        };
+      });
+  }, [pastOrders, tableStatusesState]);
+
 
   const setTable = useCallback((table: string) => {
     setTableNumber(table);
@@ -204,14 +220,13 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     }
 
     let newOrderId = nanoid(6);
-    // Ensure the ID is unique
     while (pastOrders.some(order => order.id === newOrderId)) {
         newOrderId = nanoid(6);
     }
     
     const newOrder: PastOrder = {
       id: newOrderId,
-      userId: `guest-${nanoid(8)}`, // Anonymous user ID
+      userId: `guest-${nanoid(8)}`,
       userName: customer.name,
       userPhone: customer.phone,
       tableNumber: tableNumber,
@@ -312,7 +327,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         if (period === 'daily') return { start: startOfToday(), end: endOfToday() };
         if (period === 'weekly') return { start: startOfWeek(now), end: endOfWeek(now) };
         if (period === 'monthly') return { start: startOfMonth(now), end: endOfMonth(now) };
-        return { start: new Date(0), end: now }; // All-time
+        return { start: new Date(0), end: now };
     };
 
     const interval = getPeriodInterval(analyticsPeriod);
@@ -322,7 +337,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     const newOrders = periodOrders.length;
     const avgOrderValue = newOrders > 0 ? totalRevenue / newOrders : 0;
 
-    // These are placeholder values as we don't have historical data to compare against
     const revenueChangeText = `based on ${analyticsPeriod} data`;
     const ordersChangeText = `for the ${analyticsPeriod} period`;
     const avgValueChangeText = `over the ${analyticsPeriod} period`;
@@ -360,7 +374,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <CartContext.Provider
-      value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, getTotalPrice, placeOrder, pastOrders, kitchenOrders, updateKitchenOrderStatus, approvePayment, deleteOrder, taxRate, setTaxRate, menuItems, setMenuItems, analytics, salesData, isCartLoading, tableNumber, setTable, tableStatuses, analyticsPeriod, setAnalyticsPeriod }}
+      value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, getTotalPrice, placeOrder, pastOrders, kitchenOrders, updateKitchenOrderStatus, approvePayment, deleteOrder, taxRate, setTaxRate, menuItems, setMenuItems, analytics, salesData, isCartLoading, tableNumber, setTable, tableStatuses, addTable, analyticsPeriod, setAnalyticsPeriod }}
     >
       {children}
     </CartContext.Provider>

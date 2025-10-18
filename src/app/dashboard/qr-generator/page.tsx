@@ -9,17 +9,17 @@ import { useCart } from '@/hooks/use-cart';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { UtensilsCrossed } from 'lucide-react';
+import { PlusCircle, UtensilsCrossed } from 'lucide-react';
 
 export default function QrGeneratorPage() {
   const [baseUrl, setBaseUrl] = useState('');
   const [restaurantName, setRestaurantName] = useState('MunchMate');
   const [tagline, setTagline] = useState('Scan, Order, Enjoy!');
-  const { tableStatuses } = useCart();
+  const [newTableNumber, setNewTableNumber] = useState('');
+  const { tableStatuses, addTable } = useCart();
   const { toast } = useToast();
 
   useEffect(() => {
-    // This ensures we get the base URL only on the client-side
     if (typeof window !== 'undefined') {
       setBaseUrl(window.location.origin);
       const savedName = localStorage.getItem('qrRestaurantName');
@@ -37,6 +37,32 @@ export default function QrGeneratorPage() {
       description: 'Your restaurant name and tagline have been updated for the QR codes.',
     });
   };
+
+  const handleAddTable = () => {
+    const num = parseInt(newTableNumber, 10);
+    if (isNaN(num) || num <= 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Table Number',
+        description: 'Please enter a valid, positive number for the table.',
+      });
+      return;
+    }
+    const success = addTable(num);
+    if (success) {
+      toast({
+        title: 'Table Added',
+        description: `Table ${num} has been successfully added.`,
+      });
+      setNewTableNumber('');
+    } else {
+       toast({
+        variant: 'destructive',
+        title: 'Table Exists',
+        description: `Table ${num} already exists.`,
+      });
+    }
+  }
 
   const handlePrint = () => {
     window.print();
@@ -57,29 +83,46 @@ export default function QrGeneratorPage() {
           <h1 className="text-2xl font-bold">QR Code Generator</h1>
           <Button onClick={handlePrint}>Print QR Codes</Button>
         </div>
-        <Card>
-            <CardHeader>
-                <CardTitle>Restaurant Details</CardTitle>
-                <CardDescription>Customize the details shown on the QR code cards.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                    <Label htmlFor="restaurant-name">Restaurant Name</Label>
-                    <Input id="restaurant-name" value={restaurantName} onChange={(e) => setRestaurantName(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="tagline">Tagline</Label>
-                    <Input id="tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} />
-                </div>
-                <div className="md:col-span-2 flex justify-end">
-                    <Button onClick={handleSaveDetails}>Save Details</Button>
-                </div>
-            </CardContent>
-        </Card>
+        <div className="grid md:grid-cols-2 gap-8">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Restaurant Details</CardTitle>
+                    <CardDescription>Customize the details shown on the QR code cards.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="restaurant-name">Restaurant Name</Label>
+                        <Input id="restaurant-name" value={restaurantName} onChange={(e) => setRestaurantName(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="tagline">Tagline</Label>
+                        <Input id="tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} />
+                    </div>
+                    <div className="flex justify-end">
+                        <Button onClick={handleSaveDetails}>Save Details</Button>
+                    </div>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Add New Table</CardTitle>
+                    <CardDescription>Generate a QR code for a new table.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="new-table">Table Number</Label>
+                        <Input id="new-table" type="number" placeholder="e.g., 13" value={newTableNumber} onChange={(e) => setNewTableNumber(e.target.value)} />
+                    </div>
+                    <div className="flex justify-end">
+                        <Button onClick={handleAddTable}><PlusCircle className="mr-2 h-4 w-4" /> Add Table</Button>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 print:grid-cols-3 print:gap-4" id="qr-code-grid">
-        {tableStatuses.map((table) => (
+        {tableStatuses.sort((a, b) => a.id - b.id).map((table) => (
           <Card key={table.id} className="text-center break-inside-avoid print:border-2 print:shadow-none">
             <CardContent className="flex flex-col items-center justify-center gap-4 p-6">
                 <div className='text-center'>
